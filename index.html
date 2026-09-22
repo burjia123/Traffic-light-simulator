@@ -271,6 +271,28 @@
     renderCards();
     setInterval(tick, 200);
     tick();
+    // Keep screen awake using Web Screen Wake Lock API
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) {
+    console.log(`Wake Lock error: ${err.name}, ${err.message}`);
+  }
+}
+
+// Request wake lock when page loads
+requestWakeLock();
+
+// Re-apply wake lock if user switches back to the app/tab
+document.addEventListener('visibilitychange', async () => {
+  if (wakeLock !== null && document.visibilityState === 'visible') {
+    await requestWakeLock();
+  }
+});
   </script>
 </body>
 </html>
