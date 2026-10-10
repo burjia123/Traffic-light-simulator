@@ -8,9 +8,9 @@
   <style>
     body { background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .light-off { opacity: 0.12; filter: grayscale(100%); }
-    .light-red { background-color: #ff3b30; box-shadow: 0 0 40px #ff3b30, 0 0 80px #ff3b30; }
-    .light-yellow { background-color: #ffcc00; box-shadow: 0 0 40px #ffcc00, 0 0 80px #ffcc00; }
-    .light-green { background-color: #34c759; box-shadow: 0 0 40px #34c759, 0 0 80px #34c759; }
+    .light-red { background-color: #ff3b30; box-shadow: 0 0 30px #ff3b30, 0 0 60px #ff3b30; }
+    .light-yellow { background-color: #ffcc00; box-shadow: 0 0 30px #ffcc00, 0 0 60px #ffcc00; }
+    .light-green { background-color: #34c759; box-shadow: 0 0 30px #34c759, 0 0 60px #34c759; }
     select, input { background-color: #1c2333; color: white; border: 1px solid #374151; }
   </style>
 </head>
@@ -18,7 +18,7 @@
 
   <header class="w-full max-w-md flex justify-between items-center py-4 mb-2">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white">Traffic Control</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Traffic Control (6 Lights)</h1>
       <p id="live-clock" class="text-xs text-gray-400 font-mono mt-1">Clock: 00:00:00 AM</p>
     </div>
     <button onclick="toggleGlobalPower()" id="global-power-btn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-sm shadow-lg transition">
@@ -26,19 +26,25 @@
     </button>
   </header>
 
-  <!-- 4 Light Grid -->
-  <main class="w-full max-w-md grid grid-cols-2 gap-4" id="lights-container"></main>
+  <!-- 6 Light Grid -->
+  <main class="w-full max-w-md grid grid-cols-2 gap-4 pb-12" id="lights-container"></main>
 
   <!-- Modal Settings -->
-  <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-      <div class="flex justify-between items-center mb-6">
+  <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl my-auto">
+      <div class="flex justify-between items-center mb-4">
         <h3 id="modal-title" class="text-xl font-bold text-white">Light # Settings</h3>
         <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
       </div>
 
+      <!-- Schedule Tabs -->
+      <div class="flex bg-gray-800 p-1 rounded-xl mb-4">
+        <button onclick="switchModalTab(0)" id="tab-btn-0" class="flex-1 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white transition">Schedule 1</button>
+        <button onclick="switchModalTab(1)" id="tab-btn-1" class="flex-1 py-2 text-xs font-bold rounded-lg text-gray-400 transition">Schedule 2</button>
+      </div>
+
       <div class="space-y-4">
-        <!-- iOS Compatible Time Selector (Hours, Minutes, Seconds) -->
+        <!-- Start Time -->
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Start Time (HH : MM : SS)</label>
           <div class="grid grid-cols-4 gap-2">
@@ -77,7 +83,7 @@
         </div>
       </div>
 
-      <div class="mt-8 flex gap-3">
+      <div class="mt-6 flex gap-3">
         <button onclick="closeModal()" class="flex-1 py-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl text-gray-300">Cancel</button>
         <button onclick="saveModalSettings()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 font-bold rounded-xl text-white shadow-lg">Save Settings</button>
       </div>
@@ -85,15 +91,22 @@
   </div>
 
   <script>
+    const DEFAULT_SCHEDULE = (hr, min, phase, g, y, r) => ({
+      startHr: hr, startMin: min, startSec: 0, startAmPm: 'AM', startPhase: phase, greenDur: g, yellowDur: y, redDur: r
+    });
+
     const DEFAULT_CONFIGS = [
-      { id: 1, enabled: true, startHr: 12, startMin: 0, startSec: 0, startAmPm: 'PM', startPhase: 'green', greenDur: 60, yellowDur: 5, redDur: 60 },
-      { id: 2, enabled: true, startHr: 12, startMin: 0, startSec: 0, startAmPm: 'PM', startPhase: 'green', greenDur: 45, yellowDur: 5, redDur: 45 },
-      { id: 3, enabled: true, startHr: 12, startMin: 0, startSec: 0, startAmPm: 'PM', startPhase: 'red',   greenDur: 60, yellowDur: 5, redDur: 60 },
-      { id: 4, enabled: true, startHr: 12, startMin: 0, startSec: 0, startAmPm: 'PM', startPhase: 'green', greenDur: 30, yellowDur: 3, redDur: 30 }
+      { id: 1, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',60,5,60), DEFAULT_SCHEDULE(6,0,'green',30,3,30) ] },
+      { id: 2, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',45,5,45), DEFAULT_SCHEDULE(6,0,'green',20,3,20) ] },
+      { id: 3, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',60,5,60),   DEFAULT_SCHEDULE(6,0,'red',30,3,30)   ] },
+      { id: 4, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',30,3,30), DEFAULT_SCHEDULE(6,0,'green',15,2,15) ] },
+      { id: 5, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',50,5,50), DEFAULT_SCHEDULE(6,0,'green',25,3,25) ] },
+      { id: 6, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',40,4,40),   DEFAULT_SCHEDULE(6,0,'red',20,2,20)   ] }
     ];
 
-    let lights = JSON.parse(localStorage.getItem('traffic_lights_cfg_v2')) || DEFAULT_CONFIGS;
+    let lights = JSON.parse(localStorage.getItem('traffic_lights_cfg_v3')) || DEFAULT_CONFIGS;
     let activeModalIndex = null;
+    let modalActiveTab = 0;
 
     function populateSelects() {
       const hrSel = document.getElementById('cfg-hr');
@@ -113,7 +126,7 @@
     }
 
     function saveState() {
-      localStorage.setItem('traffic_lights_cfg_v2', JSON.stringify(lights));
+      localStorage.setItem('traffic_lights_cfg_v3', JSON.stringify(lights));
     }
 
     function renderCards() {
@@ -126,23 +139,21 @@
         card.innerHTML = `
           <div class="w-full flex justify-between items-center mb-3">
             <span class="font-black text-sm text-gray-400">LIGHT ${light.id}</span>
-            <div class="flex items-center gap-2">
-              <button onclick="openModal(${idx})" class="text-gray-400 hover:text-white p-1">
-                ⚙️
-              </button>
+            <div class="flex items-center gap-1">
+              <button onclick="openModal(${idx})" class="text-gray-400 hover:text-white p-1 text-sm">⚙️</button>
               <input type="checkbox" ${light.enabled ? 'checked' : ''} onchange="toggleLight(${idx})" class="w-5 h-5 accent-blue-500 rounded cursor-pointer" />
             </div>
           </div>
 
           <!-- Light Box -->
-          <div class="bg-black/90 p-3 rounded-2xl flex flex-col gap-3 border border-gray-800 shadow-inner my-2">
-            <div id="light-${idx}-red" class="w-12 h-12 rounded-full light-off transition-all duration-300"></div>
-            <div id="light-${idx}-yellow" class="w-12 h-12 rounded-full light-off transition-all duration-300"></div>
-            <div id="light-${idx}-green" class="w-12 h-12 rounded-full light-off transition-all duration-300"></div>
+          <div class="bg-black/90 p-3 rounded-2xl flex flex-col gap-2.5 border border-gray-800 shadow-inner my-1">
+            <div id="light-${idx}-red" class="w-10 h-10 rounded-full light-off transition-all duration-300"></div>
+            <div id="light-${idx}-yellow" class="w-10 h-10 rounded-full light-off transition-all duration-300"></div>
+            <div id="light-${idx}-green" class="w-10 h-10 rounded-full light-off transition-all duration-300"></div>
           </div>
 
           <!-- Giant Timer Display -->
-          <div id="timer-${idx}" class="text-5xl font-extrabold font-mono tracking-tight text-white mt-3 mb-1">
+          <div id="timer-${idx}" class="text-4xl font-extrabold font-mono tracking-tight text-white mt-2 mb-1">
             00
           </div>
         `;
@@ -150,14 +161,25 @@
       });
     }
 
-    function getStartTimeMs(light, now) {
-      let hr = parseInt(light.startHr, 10);
-      if (light.startAmPm === 'PM' && hr < 12) hr += 12;
-      if (light.startAmPm === 'AM' && hr === 12) hr = 0;
+    function getScheduleStartMs(sched, now) {
+      let hr = parseInt(sched.startHr, 10);
+      if (sched.startAmPm === 'PM' && hr < 12) hr += 12;
+      if (sched.startAmPm === 'AM' && hr === 12) hr = 0;
 
       const startTime = new Date(now);
-      startTime.setHours(hr, parseInt(light.startMin, 10), parseInt(light.startSec, 10), 0);
+      startTime.setHours(hr, parseInt(sched.startMin, 10), parseInt(sched.startSec, 10), 0);
       return startTime.getTime();
+    }
+
+    function getActiveSchedule(light, now) {
+      const s0Ms = getScheduleStartMs(light.schedules[0], now);
+      const s1Ms = getScheduleStartMs(light.schedules[1], now);
+      const nowMs = now.getTime();
+
+      // If both schedules start today, pick the one whose start time has most recently passed
+      if (nowMs >= s1Ms && s1Ms > s0Ms) return light.schedules[1];
+      if (nowMs >= s0Ms && s0Ms > s1Ms) return light.schedules[0];
+      return nowMs >= s1Ms ? light.schedules[1] : light.schedules[0];
     }
 
     function tick() {
@@ -171,27 +193,28 @@
         const timerEl = document.getElementById(`timer-${idx}`);
 
         if (!light.enabled) {
-          redEl.className = 'w-12 h-12 rounded-full light-off';
-          yellowEl.className = 'w-12 h-12 rounded-full light-off';
-          greenEl.className = 'w-12 h-12 rounded-full light-off';
+          redEl.className = 'w-10 h-10 rounded-full light-off';
+          yellowEl.className = 'w-10 h-10 rounded-full light-off';
+          greenEl.className = 'w-10 h-10 rounded-full light-off';
           timerEl.innerText = '--';
           return;
         }
 
-        const startMs = getStartTimeMs(light, now);
-        const greenD = parseInt(light.greenDur, 10) || 1;
-        const yellowD = parseInt(light.yellowDur, 10) || 1;
-        const redD = parseInt(light.redDur, 10) || 1;
+        const activeSched = getActiveSchedule(light, now);
+        const startMs = getScheduleStartMs(activeSched, now);
+
+        const greenD = parseInt(activeSched.greenDur, 10) || 1;
+        const yellowD = parseInt(activeSched.yellowDur, 10) || 1;
+        const redD = parseInt(activeSched.redDur, 10) || 1;
         const cycleTotalSec = greenD + yellowD + redD;
 
         let diffSec = Math.floor((now.getTime() - startMs) / 1000);
         let cycleOffset = diffSec % cycleTotalSec;
         if (cycleOffset < 0) cycleOffset += cycleTotalSec;
 
-        // Determine offset based on initial phase
         let phaseShift = 0;
-        if (light.startPhase === 'yellow') phaseShift = greenD;
-        if (light.startPhase === 'red') phaseShift = greenD + yellowD;
+        if (activeSched.startPhase === 'yellow') phaseShift = greenD;
+        if (activeSched.startPhase === 'red') phaseShift = greenD + yellowD;
 
         const effectiveOffset = (cycleOffset + phaseShift) % cycleTotalSec;
 
@@ -209,9 +232,9 @@
           remaining = cycleTotalSec - effectiveOffset;
         }
 
-        redEl.className = 'w-12 h-12 rounded-full ' + (activeColor === 'red' ? 'light-red' : 'light-off');
-        yellowEl.className = 'w-12 h-12 rounded-full ' + (activeColor === 'yellow' ? 'light-yellow' : 'light-off');
-        greenEl.className = 'w-12 h-12 rounded-full ' + (activeColor === 'green' ? 'light-green' : 'light-off');
+        redEl.className = 'w-10 h-10 rounded-full ' + (activeColor === 'red' ? 'light-red' : 'light-off');
+        yellowEl.className = 'w-10 h-10 rounded-full ' + (activeColor === 'yellow' ? 'light-yellow' : 'light-off');
+        greenEl.className = 'w-10 h-10 rounded-full ' + (activeColor === 'green' ? 'light-green' : 'light-off');
 
         timerEl.innerText = remaining.toString().padStart(2, '0');
       });
@@ -232,17 +255,47 @@
 
     function openModal(idx) {
       activeModalIndex = idx;
-      const l = lights[idx];
-      document.getElementById('modal-title').innerText = `Light #${l.id} Settings`;
-      document.getElementById('cfg-hr').value = l.startHr;
-      document.getElementById('cfg-min').value = l.startMin;
-      document.getElementById('cfg-sec').value = l.startSec;
-      document.getElementById('cfg-ampm').value = l.startAmPm;
-      document.getElementById('cfg-start-phase').value = l.startPhase || 'green';
-      document.getElementById('cfg-dur-green').value = l.greenDur;
-      document.getElementById('cfg-dur-yellow').value = l.yellowDur;
-      document.getElementById('cfg-dur-red').value = l.redDur;
+      modalActiveTab = 0;
+      loadModalTabData(0);
       document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function switchModalTab(tabIndex) {
+      // Save current tab data first
+      saveModalTabData(modalActiveTab);
+      modalActiveTab = tabIndex;
+      loadModalTabData(tabIndex);
+
+      document.getElementById('tab-btn-0').className = tabIndex === 0 ? "flex-1 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white transition" : "flex-1 py-2 text-xs font-bold rounded-lg text-gray-400 transition";
+      document.getElementById('tab-btn-1').className = tabIndex === 1 ? "flex-1 py-2 text-xs font-bold rounded-lg bg-blue-600 text-white transition" : "flex-1 py-2 text-xs font-bold rounded-lg text-gray-400 transition";
+    }
+
+    function loadModalTabData(tabIndex) {
+      if (activeModalIndex === null) return;
+      const l = lights[activeModalIndex];
+      const sched = l.schedules[tabIndex];
+      document.getElementById('modal-title').innerText = `Light #${l.id} Settings`;
+      document.getElementById('cfg-hr').value = sched.startHr;
+      document.getElementById('cfg-min').value = sched.startMin;
+      document.getElementById('cfg-sec').value = sched.startSec;
+      document.getElementById('cfg-ampm').value = sched.startAmPm;
+      document.getElementById('cfg-start-phase').value = sched.startPhase || 'green';
+      document.getElementById('cfg-dur-green').value = sched.greenDur;
+      document.getElementById('cfg-dur-yellow').value = sched.yellowDur;
+      document.getElementById('cfg-dur-red').value = sched.redDur;
+    }
+
+    function saveModalTabData(tabIndex) {
+      if (activeModalIndex === null) return;
+      const sched = lights[activeModalIndex].schedules[tabIndex];
+      sched.startHr = parseInt(document.getElementById('cfg-hr').value, 10);
+      sched.startMin = parseInt(document.getElementById('cfg-min').value, 10);
+      sched.startSec = parseInt(document.getElementById('cfg-sec').value, 10);
+      sched.startAmPm = document.getElementById('cfg-ampm').value;
+      sched.startPhase = document.getElementById('cfg-start-phase').value;
+      sched.greenDur = parseInt(document.getElementById('cfg-dur-green').value, 10) || 1;
+      sched.yellowDur = parseInt(document.getElementById('cfg-dur-yellow').value, 10) || 1;
+      sched.redDur = parseInt(document.getElementById('cfg-dur-red').value, 10) || 1;
     }
 
     function closeModal() {
@@ -252,47 +305,33 @@
 
     function saveModalSettings() {
       if (activeModalIndex === null) return;
-      const l = lights[activeModalIndex];
-      l.startHr = parseInt(document.getElementById('cfg-hr').value, 10);
-      l.startMin = parseInt(document.getElementById('cfg-min').value, 10);
-      l.startSec = parseInt(document.getElementById('cfg-sec').value, 10);
-      l.startAmPm = document.getElementById('cfg-ampm').value;
-      l.startPhase = document.getElementById('cfg-start-phase').value;
-      l.greenDur = parseInt(document.getElementById('cfg-dur-green').value, 10) || 1;
-      l.yellowDur = parseInt(document.getElementById('cfg-dur-yellow').value, 10) || 1;
-      l.redDur = parseInt(document.getElementById('cfg-dur-red').value, 10) || 1;
-
+      saveModalTabData(modalActiveTab);
       saveState();
       closeModal();
       tick();
     }
 
+    // Screen Wake Lock API
+    async function initWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          let wakeLock = await navigator.wakeLock.request('screen');
+          document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+              wakeLock = await navigator.wakeLock.request('screen');
+            }
+          });
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
     populateSelects();
     renderCards();
+    initWakeLock();
     setInterval(tick, 200);
     tick();
-    // Keep screen awake using Web Screen Wake Lock API
-let wakeLock = null;
-
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-    }
-  } catch (err) {
-    console.log(`Wake Lock error: ${err.name}, ${err.message}`);
-  }
-}
-
-// Request wake lock when page loads
-requestWakeLock();
-
-// Re-apply wake lock if user switches back to the app/tab
-document.addEventListener('visibilitychange', async () => {
-  if (wakeLock !== null && document.visibilityState === 'visible') {
-    await requestWakeLock();
-  }
-});
   </script>
 </body>
 </html>
