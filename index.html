@@ -12,13 +12,22 @@
     .light-yellow { background-color: #ffcc00; box-shadow: 0 0 30px #ffcc00, 0 0 60px #ffcc00; }
     .light-green { background-color: #34c759; box-shadow: 0 0 30px #34c759, 0 0 60px #34c759; }
     select, input { background-color: #1c2333; color: white; border: 1px solid #374151; }
+    /* Hide number input spinners */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen p-4 flex flex-col items-center">
 
   <header class="w-full max-w-md flex justify-between items-center py-4 mb-2">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight text-white">Traffic Control (6 Lights)</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Traffic Control</h1>
       <p id="live-clock" class="text-xs text-gray-400 font-mono mt-1">Clock: 00:00:00 AM</p>
     </div>
     <button onclick="toggleGlobalPower()" id="global-power-btn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-sm shadow-lg transition">
@@ -33,7 +42,7 @@
   <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50 overflow-y-auto">
     <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl my-auto">
       <div class="flex justify-between items-center mb-4">
-        <h3 id="modal-title" class="text-xl font-bold text-white">Light # Settings</h3>
+        <h3 id="modal-title" class="text-xl font-bold text-white">Light Settings</h3>
         <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
       </div>
 
@@ -96,15 +105,18 @@
     });
 
     const DEFAULT_CONFIGS = [
-      { id: 1, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',60,5,60), DEFAULT_SCHEDULE(6,0,'green',30,3,30) ] },
-      { id: 2, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',45,5,45), DEFAULT_SCHEDULE(6,0,'green',20,3,20) ] },
-      { id: 3, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',60,5,60),   DEFAULT_SCHEDULE(6,0,'red',30,3,30)   ] },
-      { id: 4, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',30,3,30), DEFAULT_SCHEDULE(6,0,'green',15,2,15) ] },
-      { id: 5, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',50,5,50), DEFAULT_SCHEDULE(6,0,'green',25,3,25) ] },
-      { id: 6, enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',40,4,40),   DEFAULT_SCHEDULE(6,0,'red',20,2,20)   ] }
+      { id: 1, name: "LIGHT 1", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',60,5,60), DEFAULT_SCHEDULE(6,0,'green',30,3,30) ] },
+      { id: 2, name: "LIGHT 2", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',45,5,45), DEFAULT_SCHEDULE(6,0,'green',20,3,20) ] },
+      { id: 3, name: "LIGHT 3", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',60,5,60),   DEFAULT_SCHEDULE(6,0,'red',30,3,30)   ] },
+      { id: 4, name: "LIGHT 4", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',30,3,30), DEFAULT_SCHEDULE(6,0,'green',15,2,15) ] },
+      { id: 5, name: "LIGHT 5", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'green',50,5,50), DEFAULT_SCHEDULE(6,0,'green',25,3,25) ] },
+      { id: 6, name: "LIGHT 6", enabled: true, activeTab: 0, schedules: [ DEFAULT_SCHEDULE(6,0,'red',40,4,40),   DEFAULT_SCHEDULE(6,0,'red',20,2,20)   ] }
     ];
 
-    let lights = JSON.parse(localStorage.getItem('traffic_lights_cfg_v3')) || DEFAULT_CONFIGS;
+    let lights = JSON.parse(localStorage.getItem('traffic_lights_cfg_v4')) || DEFAULT_CONFIGS;
+    // Ensure backwards compatibility if name property was missing
+    lights.forEach(l => { if (!l.name) l.name = `LIGHT ${l.id}`; });
+
     let activeModalIndex = null;
     let modalActiveTab = 0;
 
@@ -126,7 +138,7 @@
     }
 
     function saveState() {
-      localStorage.setItem('traffic_lights_cfg_v3', JSON.stringify(lights));
+      localStorage.setItem('traffic_lights_cfg_v4', JSON.stringify(lights));
     }
 
     function renderCards() {
@@ -138,7 +150,7 @@
         card.className = "bg-gray-900 border border-gray-800 rounded-3xl p-4 flex flex-col items-center relative shadow-xl";
         card.innerHTML = `
           <div class="w-full flex justify-between items-center mb-3">
-            <span class="font-black text-sm text-gray-400">LIGHT ${light.id}</span>
+            <input type="text" value="${light.name}" onchange="updateLightName(${idx}, this.value)" class="font-black text-xs bg-transparent border-none text-gray-300 w-28 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1" />
             <div class="flex items-center gap-1">
               <button onclick="openModal(${idx})" class="text-gray-400 hover:text-white p-1 text-sm">⚙️</button>
               <input type="checkbox" ${light.enabled ? 'checked' : ''} onchange="toggleLight(${idx})" class="w-5 h-5 accent-blue-500 rounded cursor-pointer" />
@@ -161,6 +173,11 @@
       });
     }
 
+    function updateLightName(idx, newName) {
+      lights[idx].name = newName.trim() || `LIGHT ${lights[idx].id}`;
+      saveState();
+    }
+
     function getScheduleStartMs(sched, now) {
       let hr = parseInt(sched.startHr, 10);
       if (sched.startAmPm === 'PM' && hr < 12) hr += 12;
@@ -176,7 +193,6 @@
       const s1Ms = getScheduleStartMs(light.schedules[1], now);
       const nowMs = now.getTime();
 
-      // If both schedules start today, pick the one whose start time has most recently passed
       if (nowMs >= s1Ms && s1Ms > s0Ms) return light.schedules[1];
       if (nowMs >= s0Ms && s0Ms > s1Ms) return light.schedules[0];
       return nowMs >= s1Ms ? light.schedules[1] : light.schedules[0];
@@ -261,7 +277,6 @@
     }
 
     function switchModalTab(tabIndex) {
-      // Save current tab data first
       saveModalTabData(modalActiveTab);
       modalActiveTab = tabIndex;
       loadModalTabData(tabIndex);
@@ -274,7 +289,7 @@
       if (activeModalIndex === null) return;
       const l = lights[activeModalIndex];
       const sched = l.schedules[tabIndex];
-      document.getElementById('modal-title').innerText = `Light #${l.id} Settings`;
+      document.getElementById('modal-title').innerText = `${l.name} Settings`;
       document.getElementById('cfg-hr').value = sched.startHr;
       document.getElementById('cfg-min').value = sched.startMin;
       document.getElementById('cfg-sec').value = sched.startSec;
@@ -311,7 +326,6 @@
       tick();
     }
 
-    // Screen Wake Lock API
     async function initWakeLock() {
       try {
         if ('wakeLock' in navigator) {
